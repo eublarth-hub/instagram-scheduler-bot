@@ -14,7 +14,8 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
   if (existing) {
     return res.status(409).json({ message: 'User already exists.' });
   }
@@ -26,10 +27,10 @@ router.post('/register', async (req, res) => {
   db.prepare(`
     INSERT INTO users (id, email, password, authToken, createdAt)
     VALUES (?, ?, ?, ?, ?)
-  `).run(userId, email.toLowerCase(), hashedPassword, token, new Date().toISOString());
+  `).run(userId, normalizedEmail, hashedPassword, token, new Date().toISOString());
 
-  res.status(201).json({
-    user: { id: userId, email: email.toLowerCase() },
+  return res.status(201).json({
+    user: { id: userId, email: normalizedEmail },
     token
   });
 });
@@ -41,7 +42,9 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(normalizedEmail);
+
   if (!user) {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
@@ -54,7 +57,7 @@ router.post('/login', async (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('UPDATE users SET authToken = ? WHERE id = ?').run(token, user.id);
 
-  res.json({
+  return res.json({
     user: { id: user.id, email: user.email },
     token
   });
@@ -62,7 +65,7 @@ router.post('/login', async (req, res) => {
 
 router.get('/me', requireAuth, (req, res) => {
   const user = db.prepare('SELECT id, email, createdAt FROM users WHERE id = ?').get(req.user.id);
-  res.json(user);
+  return res.json(user);
 });
 
 module.exports = router;

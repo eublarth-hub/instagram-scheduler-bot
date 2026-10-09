@@ -1,20 +1,97 @@
 const { db } = require('../db');
+const { publishToInstagram } = require('./instagramService');
+const { v4: uuidv4 } = require('uuid');
 
-function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-  if (!token) {
-    return res.status(401).json({ message: 'Authentication required.' });
-  }
-
-  const user = db.prepare('SELECT id, email FROM users WHERE authToken = ?').get(token);
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid token.' });
-  }
-
-  req.user = user;
-  next();
+function addPublicationHistory(publicationId, status, message) {
+  db.prepare(`
+    INSERT INTO publication_history (id, publicationId, status, message, createdAt)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(uuidv4(), publicationId, status, message, new Date().toISOString());
 }
 
-module.exports = { requireAuth };
+function updatePublicationStatus(publicationId, updates) {
+  const fields = [];
+  const values = [];
+
+  Object.entries(updates).forEach(([key, value]) => {
+    fields.push(`${key} = ?`);
+    values.push(value);
+  });
+
+  db.prepare(`
+    UPDATE publications
+    SET ${fields.join(', ')}, updatedAt = ?
+    WHERE id = ?
+  `).run(...values, new Date().toISOString(), publicationId);
+}
+
+async function processDuePublications() {
+  const now = new Date().toISOString();
+
+  const duePublications = db.prepare(`
+    SELECT p.*, a.username, a.accessToken, a.igUserId
+    FROM publications p
+    INNER JOIN instagram_accounts a ON a.id = p.accountId
+    WHERE p.status = 'scheduled'
+      AND p.scheduledAt <= ?
+    ORDER BY p.scheduledAt ASC
+  `).all(now);
+
+  for (const publication of duePublications) {
+    try {
+      const result = await publishToInstagram(publication, {
+        username: publication.username,
+        accessToken: publication.accessToken,
+        igUserId: publication.igUserId
+      });
+
+      updatePublicationStatus(publication.id, {
+        status: 'published',
+        publishedAt: new Date().toISOString(),
+        lastError: null,
+        retryCount: publication.retryCount || 0
+      });
+
+      addPublicationHistory(publication.id, 'published', result.message || 'Published successfully.');
+    } catch (error) {
+      const nextRetryCount = (publication.retryCount || 0) + 1;
+
+      if (nextRetryCount >= 3) {
+        updatePublicationStatus(publication.id, {
+          status: 'failed',
+          lastError: error.message,
+          retryCount: nextRetryCount
+        });
+
+        addPublicationHistory(publication.id, 'failed', error.message);
+      } else {
+        const newTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+        updatePublicationStatus(publication.id, {
+          status: 'scheduled',
+          scheduledAt: newTime,
+          retryCount: nextRetryCount,
+          lastError: error.message
+        });
+
+        addPublicationHistory(publication.id, 'retry', `Retry ${nextRetryCount}/3 scheduled for ${newTime}.`);
+      }
+    }
+  }
+}
+
+function startScheduler(intervalMs = 30000) {
+  const interval = setInterval(() => {
+    processDuePublications().catch((error) => {
+      console.error('Scheduler error:', error);
+    });
+  }, intervalMs);
+
+  processDuePublications().catch((error) => {
+    console.error('Initial scheduler run failed:', error);
+  });
+
+  return interval;
+}
+
+module.exports = { processDuePublications, startScheduler };

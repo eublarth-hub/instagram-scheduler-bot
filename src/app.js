@@ -1,13 +1,27 @@
 const express = require('express');
-const { db } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const cors = require('cors');
+const path = require('path');
+const authRouter = require('./routes/auth');
+const accountsRouter = require('./routes/accounts');
+const publicationsRouter = require('./routes/publications');
 
-const router = express.Router();
-router.use(requireAuth);
+const app = express();
 
-router.get('/me', (req, res) => {
-  const user = db.prepare('SELECT id, email, createdAt FROM users WHERE id = ?').get(req.user.id);
-  return res.json(user);
+app.use(cors());
+app.use(express.json({ limit: '20mb' }));
+
+app.get('/api/health', (req, res) => {
+  return res.json({ status: 'ok', message: 'Instagram Scheduler Bot premium MVP is running.' });
 });
 
-module.exports = router;
+app.use('/api/auth', authRouter);
+app.use('/api/accounts', accountsRouter);
+app.use('/api/publications', publicationsRouter);
+
+app.use(express.static(path.join(__dirname, '../public')));
+
+app.get('/', (req, res) => {
+  return res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+module.exports = app;

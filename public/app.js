@@ -15,7 +15,6 @@
         --primary-2: #2563eb;
         --success: #22c55e;
         --danger: #ef4444;
-        --warning: #f59e0b;
       }
 
       * { box-sizing: border-box; }
@@ -235,6 +234,8 @@
             <input id="accountUsername" type="text" placeholder="mon_compte_ig" />
             <label>Access Token</label>
             <input id="accountToken" type="text" placeholder="fake_token" />
+            <label>IG User ID</label>
+            <input id="igUserId" type="text" placeholder="1234567890" />
             <button id="addAccountBtn">Ajouter le compte</button>
           </div>
 

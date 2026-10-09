@@ -25,6 +25,9 @@ const initDatabase = () => {
       username TEXT NOT NULL,
       accessToken TEXT NOT NULL,
       refreshToken TEXT,
+      igUserId TEXT,
+      pageId TEXT,
+      accessTokenExpiry TEXT,
       status TEXT NOT NULL DEFAULT 'connected',
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES users(id)

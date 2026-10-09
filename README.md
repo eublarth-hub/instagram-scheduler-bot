@@ -220,15 +220,17 @@ async function loginUser() {
 async function addAccount() {
   const username = document.getElementById('accountUsername').value.trim();
   const accessToken = document.getElementById('accountToken').value.trim();
+  const igUserId = document.getElementById('igUserId').value.trim();
 
   try {
     await api('/accounts', {
       method: 'POST',
-      body: JSON.stringify({ username, accessToken, refreshToken: 'fake_refresh_token' })
+      body: JSON.stringify({ username, accessToken, refreshToken: 'fake_refresh_token', igUserId })
     });
 
     document.getElementById('accountUsername').value = '';
     document.getElementById('accountToken').value = '';
+    document.getElementById('igUserId').value = '';
     await loadAccounts();
   } catch (error) {
     alert(error.message);

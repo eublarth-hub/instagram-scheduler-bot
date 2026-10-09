@@ -1,130 +1,101 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-const { db } = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { processDuePublications } = require('../services/schedulerService');
+const { db } = require('../db');
 
 const router = express.Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const rows = db.prepare(`
-    SELECT p.*, a.username as accountUsername
-    FROM publications p
-    INNER JOIN instagram_accounts a ON a.id = p.accountId
-    WHERE p.userId = ?
-    ORDER BY p.scheduledAt DESC
-  `).all(req.user.id);
+router.get('/connect-url', (req, res) => {
+  const appId = process.env.META_APP_ID;
+  const redirectUri = process.env.META_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/callback';
 
-  res.json(rows);
-});
-
-router.get('/summary', (req, res) => {
-  const summary = db.prepare(`
-    SELECT
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled,
-      SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published,
-      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
-    FROM publications
-    WHERE userId = ?
-  `).get(req.user.id);
-
-  res.json(summary);
-});
-
-router.post('/', (req, res) => {
-  const { accountId, mediaType, mediaUrl, caption, scheduledAt } = req.body;
-
-  if (!accountId || !scheduledAt) {
-    return res.status(400).json({ message: 'accountId and scheduledAt are required.' });
+  if (!appId) {
+    return res.status(500).json({ message: 'META_APP_ID is missing.' });
   }
 
-  const accountExists = db.prepare('SELECT id FROM instagram_accounts WHERE id = ? AND userId = ?').get(accountId, req.user.id);
-  if (!accountExists) {
-    return res.status(404).json({ message: 'Instagram account not found.' });
+  const authUrl = new URL('https://www.facebook.com/dialog/oauth');
+  authUrl.searchParams.set('client_id', appId);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('scope', 'instagram_basic,pages_show_list,pages_read_engagement,instagram_content_publish');
+  authUrl.searchParams.set('response_type', 'code');
+
+  return res.json({ authUrl: authUrl.toString() });
+});
+
+router.get('/callback', async (req, res) => {
+  const { code } = req.query;
+
+  if (!code) {
+    return res.status(400).json({ message: 'Missing OAuth code.' });
   }
 
-  const id = uuidv4();
-  const now = new Date().toISOString();
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  const redirectUri = process.env.META_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/callback';
 
-  db.prepare(`
-    INSERT INTO publications (
-      id, userId, accountId, mediaType, mediaUrl, caption, scheduledAt, status,
-      retryCount, lastError, publishedAt, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, NULL, NULL, ?, ?)
-  `).run(
-    id,
-    req.user.id,
-    accountId,
-    mediaType || 'image',
-    mediaUrl || '',
-    caption || '',
-    new Date(scheduledAt).toISOString(),
-    now,
-    now
-  );
+  if (!appId || !appSecret) {
+    return res.status(500).json({ message: 'Missing Meta app configuration.' });
+  }
 
-  res.status(201).json({
-    id,
-    userId: req.user.id,
+  const tokenResponse = await fetch('https://graph.facebook.com/v20.0/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: redirectUri,
+      code
+    })
+  });
+
+  const tokenData = await tokenResponse.json();
+
+  if (!tokenData.access_token) {
+    return res.status(400).json({ message: 'Failed to exchange code for token', details: tokenData });
+  }
+
+  const meResponse = await fetch(`https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${tokenData.access_token}`);
+  const meData = await meResponse.json();
+
+  const accountId = meData.id;
+
+  return res.json({
+    message: 'Instagram connected successfully.',
     accountId,
-    mediaType: mediaType || 'image',
-    mediaUrl: mediaUrl || '',
-    caption: caption || '',
-    scheduledAt: new Date(scheduledAt).toISOString(),
-    status: 'scheduled'
+    tokenData,
+    meData
   });
 });
 
-router.post('/:id/publish', async (req, res) => {
-  const publication = db.prepare('SELECT * FROM publications WHERE id = ? AND userId = ?').get(req.params.id, req.user.id);
+router.post('/connect', requireAuth, (req, res) => {
+  const { username, accessToken, refreshToken, igUserId, pageId, accessTokenExpiry } = req.body;
 
-  if (!publication) {
-    return res.status(404).json({ message: 'Publication not found.' });
+  if (!username || !accessToken) {
+    return res.status(400).json({ message: 'username and accessToken are required.' });
   }
 
-  const account = db.prepare('SELECT * FROM instagram_accounts WHERE id = ?').get(publication.accountId);
-
-  try {
-    const { publishToInstagram } = require('../services/instagramService');
-    const result = await publishToInstagram(publication, account);
-
-    db.prepare(`
-      UPDATE publications
-      SET status = 'published', publishedAt = ?, lastError = NULL, updatedAt = ?
-      WHERE id = ?
-    `).run(new Date().toISOString(), new Date().toISOString(), publication.id);
-
-    db.prepare(`
-      INSERT INTO publication_history (id, publicationId, status, message, createdAt)
-      VALUES (?, ?, 'published', ?, ?)
-    `).run(uuidv4(), publication.id, result.message || 'Manual publication succeeded.', new Date().toISOString());
-
-    res.json({ message: 'Publication sent successfully.', publicationId: publication.id });
-  } catch (error) {
-    db.prepare(`
-      UPDATE publications
-      SET status = 'failed', lastError = ?, updatedAt = ?
-      WHERE id = ?
-    `).run(error.message, new Date().toISOString(), publication.id);
-
-    db.prepare(`
-      INSERT INTO publication_history (id, publicationId, status, message, createdAt)
-      VALUES (?, ?, 'failed', ?, ?)
-    `).run(uuidv4(), publication.id, error.message, new Date().toISOString());
-
-    res.status(500).json({ message: error.message });
+  const existing = db.prepare('SELECT id FROM instagram_accounts WHERE userId = ? AND username = ?').get(req.user.id, username);
+  if (existing) {
+    return res.status(409).json({ message: 'Instagram account already connected.' });
   }
-});
 
-router.post('/run-now', async (req, res) => {
-  try {
-    await processDuePublications();
-    res.json({ message: 'Scheduler ran successfully.' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO instagram_accounts (id, userId, username, accessToken, refreshToken, igUserId, pageId, accessTokenExpiry, status, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'connected', ?)
+  `).run(
+    id,
+    req.user.id,
+    username,
+    accessToken,
+    refreshToken || '',
+    igUserId || null,
+    pageId || null,
+    accessTokenExpiry || null,
+    new Date().toISOString()
+  );
+
+  return res.status(201).json({ id, username, status: 'connected' });
 });
 
 module.exports = router;

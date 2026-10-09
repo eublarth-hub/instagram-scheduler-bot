@@ -7,16 +7,11 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', (req, res) => {
-  const rows = db.prepare(`
-    SELECT * FROM instagram_accounts
-    WHERE userId = ?
-    ORDER BY createdAt DESC
-  `).all(req.user.id);
-
+  const rows = db.prepare('SELECT * FROM instagram_accounts WHERE userId = ? ORDER BY createdAt DESC').all(req.user.id);
   return res.json(rows);
 });
 
-router.post('/', (req, res) => {
+router.post('/connect', (req, res) => {
   const { username, accessToken, refreshToken, igUserId, pageId, accessTokenExpiry } = req.body;
 
   if (!username || !accessToken) {

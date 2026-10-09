@@ -9,12 +9,47 @@ async function publishToInstagram(publication, account) {
     throw new Error('Publication is missing media URL or caption.');
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  const igUserId = account.igUserId || account.username;
+
+  const createMediaResponse = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      image_url: publication.mediaUrl,
+      caption: publication.caption || '',
+      access_token: account.accessToken
+    })
+  });
+
+  const createMediaData = await createMediaResponse.json();
+
+  if (!createMediaData.id) {
+    throw new Error(`Media creation failed: ${JSON.stringify(createMediaData)}`);
+  }
+
+  const publishResponse = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      creation_id: createMediaData.id,
+      access_token: account.accessToken
+    })
+  });
+
+  const publishData = await publishResponse.json();
+
+  if (!publishData.id) {
+    throw new Error(`Publish failed: ${JSON.stringify(publishData)}`);
+  }
 
   return {
     success: true,
-    remoteId: `ig_${uuidv4()}`,
-    message: `Publication published to ${account.username} successfully.`
+    remoteId: publishData.id || `ig_${uuidv4()}`,
+    message: `Publication published to Instagram successfully.`
   };
 }
 
