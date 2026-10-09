@@ -41,7 +41,7 @@ function renderAuth() {
   }
 }
 
-function renderSummary(summary) {
+function renderSummary(summary = {}) {
   const boxes = [
     { label: 'Total', value: summary.total || 0 },
     { label: 'En attente', value: summary.scheduled || 0 },
@@ -63,6 +63,54 @@ function renderAccounts() {
   select.innerHTML = state.accounts.map((account) => `
     <option value="${account.id}">${account.username}</option>
   `).join('');
+}
+
+function renderCalendar() {
+  const calendar = document.getElementById('calendarGrid');
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  calendar.innerHTML = '';
+
+  dayNames.forEach((day) => {
+    const el = document.createElement('div');
+    el.className = 'day-name';
+    el.textContent = day;
+    calendar.appendChild(el);
+  });
+
+  const startIndex = (firstDay.getDay() + 6) % 7;
+  const totalCells = Math.ceil((startIndex + lastDay.getDate()) / 7) * 7;
+
+  const countsByDay = new Map();
+  state.publications.forEach((post) => {
+    const date = new Date(post.scheduledAt);
+    if (date.getMonth() === month && date.getFullYear() === year) {
+      const key = date.getDate();
+      countsByDay.set(key, (countsByDay.get(key) || 0) + 1);
+    }
+  });
+
+  for (let i = 0; i < totalCells; i++) {
+    const dayCell = document.createElement('div');
+    dayCell.className = 'day-cell';
+
+    const dayNumber = i - startIndex + 1;
+    if (dayNumber <= 0 || dayNumber > lastDay.getDate()) {
+      dayCell.classList.add('muted');
+      dayCell.textContent = '';
+    } else {
+      const count = countsByDay.get(dayNumber) || 0;
+      dayCell.classList.toggle('has-posts', count > 0);
+      dayCell.innerHTML = `<div class="day-number">${dayNumber}</div><div class="day-count">${count ? `${count} post${count > 1 ? 's' : ''}` : ''}</div>`;
+    }
+
+    calendar.appendChild(dayCell);
+  }
 }
 
 function renderPosts() {
@@ -114,6 +162,7 @@ async function loadPublications() {
   try {
     state.publications = await api('/publications');
     renderPosts();
+    renderCalendar();
   } catch (error) {
     console.error(error);
   }
@@ -186,12 +235,23 @@ async function addAccount() {
   }
 }
 
+async function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Erreur lors du chargement du fichier'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function createPublication() {
   const accountId = document.getElementById('postAccountSelect').value;
   const mediaType = document.getElementById('mediaType').value;
-  const mediaUrl = document.getElementById('mediaUrl').value.trim();
+  const mediaUrlInput = document.getElementById('mediaUrl').value.trim();
   const caption = document.getElementById('caption').value.trim();
   const scheduledAt = document.getElementById('scheduledAt').value;
+  const fileInput = document.getElementById('mediaFile');
+  const file = fileInput.files && fileInput.files[0];
 
   if (!accountId || !scheduledAt) {
     alert('Le compte et la date sont requis.');
@@ -199,6 +259,11 @@ async function createPublication() {
   }
 
   try {
+    let mediaUrl = mediaUrlInput;
+    if (file) {
+      mediaUrl = await readFileAsDataUrl(file);
+    }
+
     await api('/publications', {
       method: 'POST',
       body: JSON.stringify({ accountId, mediaType, mediaUrl, caption, scheduledAt })
@@ -207,6 +272,7 @@ async function createPublication() {
     document.getElementById('mediaUrl').value = '';
     document.getElementById('caption').value = '';
     document.getElementById('scheduledAt').value = '';
+    document.getElementById('mediaFile').value = '';
 
     await Promise.all([loadPublications(), loadSummary()]);
   } catch (error) {

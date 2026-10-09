@@ -15,6 +15,7 @@
         --primary-2: #2563eb;
         --success: #22c55e;
         --danger: #ef4444;
+        --warning: #f59e0b;
       }
 
       * { box-sizing: border-box; }
@@ -146,6 +147,49 @@
       .scheduled { background: rgba(245,158,11,0.2); color: #fbbf24; }
       .published { background: rgba(34,197,94,0.2); color: #4ade80; }
       .failed { background: rgba(239,68,68,0.2); color: #f87171; }
+
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+      }
+
+      .day-name, .day-cell {
+        background: #0b1220;
+        border: 1px solid var(--panel-2);
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+      }
+
+      .day-name {
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+
+      .day-cell {
+        min-height: 70px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+      }
+
+      .day-cell.has-posts {
+        border-color: var(--primary);
+        background: rgba(59, 130, 246, 0.08);
+      }
+
+      .day-number {
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+      }
+
+      .day-count {
+        font-size: 0.75rem;
+        color: #bfdbfe;
+      }
     </style>
   </head>
   <body>
@@ -203,6 +247,8 @@
               <option value="image">Image</option>
               <option value="video">Vidéo</option>
             </select>
+            <label>Choisir un fichier (optionnel)</label>
+            <input id="mediaFile" type="file" accept="image/*,video/*" />
             <label>URL média</label>
             <input id="mediaUrl" type="text" placeholder="https://..." />
             <label>Caption</label>
@@ -211,6 +257,11 @@
             <input id="scheduledAt" type="datetime-local" />
             <button id="createPostBtn" class="secondary">Planifier</button>
           </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <h3>Calendrier</h3>
+          <div id="calendarGrid" class="calendar-grid"></div>
         </div>
 
         <div class="card">
