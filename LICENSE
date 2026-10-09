@@ -1,0 +1,79 @@
+async function api(path, method = 'GET', body = null) {
+  const headers = { 'Content-Type': 'application/json' };
+
+  const response = await fetch(`/api${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : null
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Request failed');
+  }
+
+  return data;
+}
+
+document.getElementById('createUserBtn').addEventListener('click', async () => {
+  const email = document.getElementById('userEmail').value;
+  const password = document.getElementById('userPassword').value;
+
+  try {
+    const result = await api('/users', 'POST', { email, password });
+    alert('Utilisateur créé : ' + JSON.stringify(result));
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+document.getElementById('createAccountBtn').addEventListener('click', async () => {
+  const userId = document.getElementById('userId').value;
+  const username = document.getElementById('accountUsername').value;
+  const accessToken = document.getElementById('accountToken').value;
+
+  try {
+    const result = await api('/accounts', 'POST', { userId, username, accessToken, refreshToken: 'fake_refresh_token' });
+    alert('Compte Instagram ajouté : ' + JSON.stringify(result));
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+document.getElementById('createPostBtn').addEventListener('click', async () => {
+  const userId = document.getElementById('postUserId').value;
+  const accountId = document.getElementById('postAccountId').value;
+  const mediaType = document.getElementById('mediaType').value;
+  const mediaUrl = document.getElementById('mediaUrl').value;
+  const caption = document.getElementById('caption').value;
+  const scheduledAt = document.getElementById('scheduledAt').value;
+
+  try {
+    const result = await api('/publications', 'POST', {
+      userId,
+      accountId,
+      mediaType,
+      mediaUrl,
+      caption,
+      scheduledAt: new Date(scheduledAt).toISOString()
+    });
+    alert('Publication planifiée : ' + JSON.stringify(result));
+    refreshPosts();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+async function refreshPosts() {
+  try {
+    const posts = await api('/publications');
+    document.getElementById('postsResult').textContent = JSON.stringify(posts, null, 2);
+  } catch (error) {
+    document.getElementById('postsResult').textContent = error.message;
+  }
+}
+
+document.getElementById('refreshPostsBtn').addEventListener('click', refreshPosts);
+
+refreshPosts();
