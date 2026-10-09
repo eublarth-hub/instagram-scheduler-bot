@@ -1,27 +1,80 @@
-{
-  "name": "instagram-scheduler-bot",
-  "version": "2.0.0",
-  "description": "Instagram scheduler SaaS MVP v2 with auth, dashboard, and user-scoped planning",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test"
-  },
-  "keywords": [
-    "instagram",
-    "scheduler",
-    "social-media",
-    "saas",
-    "bot"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.1.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "uuid": "^9.0.0"
-  }
-}
+# Instagram Scheduler Bot
+
+Un MVP de SaaS pour planifier, enregistrer et simuler l'envoi automatique de publications Instagram.
+
+## Fonctionnalités
+
+- Authentification utilisateur
+- Inscription / connexion
+- Comptes Instagram attachés à un utilisateur
+- Planification d'une publication avec légende, média et date
+- Dashboard résumé par statut
+- Scheduler automatique de publication
+- Gestion des retries
+- Historique de publication
+
+## Stack
+
+- Node.js
+- Express
+- SQLite
+- Better-SQLite3
+- bcryptjs
+
+## Démarrage rapide
+
+```bash
+npm install
+cp .env.example .env
+npm start
+```
+
+Puis ouvrir :
+
+```bash
+http://localhost:3000
+```
+
+## API rapide
+
+### Register
+
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"azerty"}'
+```
+
+### Login
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"azerty"}'
+```
+
+### Ajouter un compte Instagram
+
+```bash
+curl -X POST http://localhost:3000/api/accounts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"username":"alice_ig","accessToken":"fake_token"}'
+```
+
+### Créer une publication
+
+```bash
+curl -X POST http://localhost:3000/api/publications \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"accountId":"<account-id>","mediaType":"image","mediaUrl":"https://example.com/img.jpg","caption":"Test","scheduledAt":"2030-01-01T12:00:00.000Z"}'
+```
+
+## Prochaine étape
+
+- calendrier visuel
+- upload réel de médias
+- analytics
+- intégration réelle Instagram Graph API
+- multi-comptes / multi-utilisateurs avancés

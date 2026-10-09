@@ -95,8 +95,8 @@ async function loadUser() {
     await Promise.all([loadAccounts(), loadPublications(), loadSummary()]);
   } catch (error) {
     state.token = '';
-    localStorage.removeItem('instagramSchedulerToken');
     state.user = null;
+    localStorage.removeItem('instagramSchedulerToken');
     renderAuth();
   }
 }

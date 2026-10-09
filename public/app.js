@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Instagram Scheduler Bot v2</title>
+    <title>Instagram Scheduler Bot</title>
     <style>
       :root {
         --bg: #0f172a;
@@ -14,7 +14,6 @@
         --primary: #3b82f6;
         --primary-2: #2563eb;
         --success: #22c55e;
-        --warning: #f59e0b;
         --danger: #ef4444;
       }
 
@@ -44,12 +43,7 @@
         font-weight: 700;
       }
 
-      .actions {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-      }
-
+      .actions { display: flex; gap: 12px; align-items: center; }
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -65,6 +59,7 @@
       }
 
       h1, h2, h3, p { margin-top: 0; }
+
       label {
         display: block;
         margin-bottom: 8px;
@@ -88,7 +83,6 @@
         background: var(--primary);
         cursor: pointer;
         font-weight: 700;
-        transition: 0.2s ease;
       }
 
       button:hover { background: var(--primary-2); }
@@ -98,18 +92,6 @@
       button.danger:hover { background: #dc2626; }
 
       .hidden { display: none !important; }
-
-      .status-pill {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 700;
-      }
-
-      .scheduled { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-      .published { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-      .failed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
 
       .summary {
         display: grid;
@@ -128,6 +110,8 @@
         font-size: 1.5rem;
         font-weight: 700;
       }
+
+      .muted { color: var(--muted); }
 
       .post-list {
         list-style: none;
@@ -151,21 +135,23 @@
         margin-bottom: 8px;
       }
 
-      .muted { color: var(--muted); }
-      pre {
-        background: #020817;
-        color: #dbeafe;
-        border-radius: 10px;
-        padding: 14px;
-        overflow: auto;
-        white-space: pre-wrap;
+      .status-pill {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
       }
+
+      .scheduled { background: rgba(245,158,11,0.2); color: #fbbf24; }
+      .published { background: rgba(34,197,94,0.2); color: #4ade80; }
+      .failed { background: rgba(239,68,68,0.2); color: #f87171; }
     </style>
   </head>
   <body>
     <div class="container">
       <header class="header">
-        <div class="brand">Instagram Scheduler Bot v2</div>
+        <div class="brand">Instagram Scheduler Bot</div>
         <div id="authActions" class="actions">
           <button id="logoutBtn" class="danger hidden">Déconnexion</button>
         </div>

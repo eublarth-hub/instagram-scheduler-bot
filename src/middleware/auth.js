@@ -1,10 +1,20 @@
-const express = require('express');
-const { requireAuth } = require('../middleware/auth');
+const { db } = require('../db');
 
-const router = express.Router();
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email });
-});
+  if (!token) {
+    return res.status(401).json({ message: 'Authentication required.' });
+  }
 
-module.exports = router;
+  const user = db.prepare('SELECT id, email FROM users WHERE authToken = ?').get(token);
+  if (!user) {
+    return res.status(401).json({ message: 'Invalid token.' });
+  }
+
+  req.user = user;
+  next();
+}
+
+module.exports = { requireAuth };

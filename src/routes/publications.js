@@ -13,7 +13,7 @@ router.get('/', (req, res) => {
     ORDER BY createdAt DESC
   `).all(req.user.id);
 
-  res.json(rows);
+  return res.json(rows);
 });
 
 router.post('/', (req, res) => {
@@ -31,7 +31,13 @@ router.post('/', (req, res) => {
     VALUES (?, ?, ?, ?, ?, 'connected', ?)
   `).run(id, req.user.id, username, accessToken, refreshToken || '', createdAt);
 
-  res.status(201).json({ id, userId: req.user.id, username, status: 'connected', createdAt });
+  return res.status(201).json({
+    id,
+    userId: req.user.id,
+    username,
+    status: 'connected',
+    createdAt
+  });
 });
 
 module.exports = router;

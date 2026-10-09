@@ -1,29 +1,13 @@
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const usersRouter = require('./routes/users');
-const accountsRouter = require('./routes/accounts');
-const publicationsRouter = require('./routes/publications');
-const authRouter = require('./routes/auth');
+const { db } = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
-const app = express();
+const router = express.Router();
+router.use(requireAuth);
 
-app.use(cors());
-app.use(express.json({ limit: '20mb' }));
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Instagram Scheduler Bot v2 is running.' });
+router.get('/me', (req, res) => {
+  const user = db.prepare('SELECT id, email, createdAt FROM users WHERE id = ?').get(req.user.id);
+  return res.json(user);
 });
 
-app.use('/api/auth', authRouter);
-app.use('/api/users', usersRouter);
-app.use('/api/accounts', accountsRouter);
-app.use('/api/publications', publicationsRouter);
-
-app.use(express.static(path.join(__dirname, '../public')));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-module.exports = app;
+module.exports = router;
