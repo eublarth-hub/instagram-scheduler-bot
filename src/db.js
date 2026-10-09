@@ -15,6 +15,7 @@ const initDatabase = () => {
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
+      authToken TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 

@@ -1,39 +1,17 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  const rows = db.prepare(`
-    SELECT * FROM users
-    ORDER BY createdAt DESC
-  `).all();
-
-  res.json(rows);
+router.get('/me', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT id, email, createdAt FROM users WHERE id = ?').get(req.user.id);
+  res.json(user);
 });
 
-router.post('/', (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'email and password are required.' });
-  }
-
-  const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (exists) {
-    return res.status(409).json({ message: 'User already exists.' });
-  }
-
-  const id = uuidv4();
-  const createdAt = new Date().toISOString();
-
-  db.prepare(`
-    INSERT INTO users (id, email, password, createdAt)
-    VALUES (?, ?, ?, ?)
-  `).run(id, email, password, createdAt);
-
-  res.status(201).json({ id, email, createdAt });
+router.get('/', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT id, email, createdAt FROM users WHERE id = ?').all(req.user.id);
+  res.json(rows);
 });
 
 module.exports = router;

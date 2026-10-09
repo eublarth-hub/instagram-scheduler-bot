@@ -3,107 +3,236 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Instagram Scheduler Bot</title>
+    <title>Instagram Scheduler Bot v2</title>
     <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --panel-2: #1f2937;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --primary: #3b82f6;
+        --primary-2: #2563eb;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+      }
+
+      * { box-sizing: border-box; }
       body {
-        font-family: Arial, sans-serif;
         margin: 0;
-        background: #0f172a;
-        color: #e2e8f0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Arial, sans-serif;
       }
 
       .container {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 40px 20px;
+        padding: 30px 20px 60px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 0 28px;
+      }
+
+      .brand {
+        font-size: 1.8rem;
+        font-weight: 700;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 20px;
       }
 
       .card {
-        background: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--panel-2);
+        border-radius: 14px;
         padding: 20px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.18);
       }
 
-      input, textarea, button, select {
+      h1, h2, h3, p { margin-top: 0; }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      input, textarea, select, button {
         width: 100%;
-        margin-top: 8px;
-        margin-bottom: 16px;
-        padding: 10px 12px;
-        border-radius: 8px;
-        border: 1px solid #374151;
+        border-radius: 10px;
+        padding: 12px 14px;
+        border: 1px solid var(--panel-2);
         background: #0b1220;
-        color: #fff;
-        box-sizing: border-box;
+        color: var(--text);
+        font-size: 1rem;
+        margin-bottom: 14px;
       }
 
       button {
-        background: #3b82f6;
         border: none;
+        background: var(--primary);
         cursor: pointer;
+        font-weight: 700;
+        transition: 0.2s ease;
+      }
+
+      button:hover { background: var(--primary-2); }
+      button.secondary { background: var(--success); }
+      button.secondary:hover { background: #1f9d4a; }
+      button.danger { background: var(--danger); }
+      button.danger:hover { background: #dc2626; }
+
+      .hidden { display: none !important; }
+
+      .status-pill {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
         font-weight: 700;
       }
 
-      button.secondary {
-        background: #16a34a;
+      .scheduled { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+      .published { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+      .failed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
       }
 
+      .summary-box {
+        background: #0b1220;
+        border: 1px solid var(--panel-2);
+        border-radius: 12px;
+        padding: 16px;
+      }
+
+      .summary-box .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .post-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+
+      .post-item {
+        background: #0b1220;
+        border: 1px solid var(--panel-2);
+        border-radius: 12px;
+        padding: 16px;
+      }
+
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .muted { color: var(--muted); }
       pre {
         background: #020817;
-        border-radius: 8px;
-        padding: 12px;
+        color: #dbeafe;
+        border-radius: 10px;
+        padding: 14px;
         overflow: auto;
-      }
-
-      h1, h2, h3 {
-        margin-top: 0;
+        white-space: pre-wrap;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Instagram Scheduler Bot</h1>
+      <header class="header">
+        <div class="brand">Instagram Scheduler Bot v2</div>
+        <div id="authActions" class="actions">
+          <button id="logoutBtn" class="danger hidden">Déconnexion</button>
+        </div>
+      </header>
 
-      <div class="grid">
+      <section id="authSection" class="grid">
         <div class="card">
-          <h2>Créer un utilisateur</h2>
-          <input id="userEmail" type="email" placeholder="Email" />
-          <input id="userPassword" type="password" placeholder="Mot de passe" />
-          <button id="createUserBtn">Créer l'utilisateur</button>
+          <h2>Inscription</h2>
+          <label>Email</label>
+          <input id="registerEmail" type="email" placeholder="you@example.com" />
+          <label>Mot de passe</label>
+          <input id="registerPassword" type="password" placeholder="••••••••" />
+          <button id="registerBtn">Créer mon compte</button>
         </div>
 
         <div class="card">
-          <h2>Ajouter un compte Instagram</h2>
-          <input id="userId" type="text" placeholder="User ID" />
-          <input id="accountUsername" type="text" placeholder="Nom d'utilisateur Instagram" />
-          <input id="accountToken" type="text" placeholder="Access token" />
-          <button id="createAccountBtn">Ajouter le compte</button>
+          <h2>Connexion</h2>
+          <label>Email</label>
+          <input id="loginEmail" type="email" placeholder="you@example.com" />
+          <label>Mot de passe</label>
+          <input id="loginPassword" type="password" placeholder="••••••••" />
+          <button id="loginBtn" class="secondary">Se connecter</button>
+        </div>
+      </section>
+
+      <section id="dashboardSection" class="hidden">
+        <div class="card" style="margin-bottom: 20px;">
+          <h2>Tableau de bord</h2>
+          <p id="welcomeText" class="muted">Bienvenue.</p>
+          <div class="summary" id="summaryBoxes"></div>
+        </div>
+
+        <div class="grid" style="margin-bottom: 20px;">
+          <div class="card">
+            <h3>Ajouter un compte Instagram</h3>
+            <label>Nom d'utilisateur</label>
+            <input id="accountUsername" type="text" placeholder="mon_compte_ig" />
+            <label>Access Token</label>
+            <input id="accountToken" type="text" placeholder="fake_token" />
+            <button id="addAccountBtn">Ajouter le compte</button>
+          </div>
+
+          <div class="card">
+            <h3>Planifier une publication</h3>
+            <label>Compte</label>
+            <select id="postAccountSelect"></select>
+            <label>Type</label>
+            <select id="mediaType">
+              <option value="image">Image</option>
+              <option value="video">Vidéo</option>
+            </select>
+            <label>URL média</label>
+            <input id="mediaUrl" type="text" placeholder="https://..." />
+            <label>Caption</label>
+            <textarea id="caption" rows="4" placeholder="Votre légende ..."></textarea>
+            <label>Date de publication</label>
+            <input id="scheduledAt" type="datetime-local" />
+            <button id="createPostBtn" class="secondary">Planifier</button>
+          </div>
         </div>
 
         <div class="card">
-          <h2>Créer une publication</h2>
-          <input id="postUserId" type="text" placeholder="User ID" />
-          <input id="postAccountId" type="text" placeholder="Account ID" />
-          <input id="mediaType" type="text" value="image" placeholder="image/video" />
-          <input id="mediaUrl" type="text" placeholder="URL du média" />
-          <textarea id="caption" rows="4" placeholder="Légende"></textarea>
-          <input id="scheduledAt" type="datetime-local" />
-          <button class="secondary" id="createPostBtn">Planifier la publication</button>
+          <h3>Publications</h3>
+          <button id="refreshPostsBtn">Rafraîchir</button>
+          <ul id="postList" class="post-list"></ul>
         </div>
-      </div>
-
-      <div class="card" style="margin-top: 30px;">
-        <h2>Publications</h2>
-        <button id="refreshPostsBtn">Rafraîchir</button>
-        <pre id="postsResult">Chargement...</pre>
-      </div>
+      </section>
     </div>
 
     <script src="./app.js"></script>

@@ -1,120 +1,236 @@
-# Instagram Scheduler Bot
+const state = {
+  token: localStorage.getItem('instagramSchedulerToken') || '',
+  user: null,
+  accounts: [],
+  publications: []
+};
 
-Un MVP de SaaS pour planifier des publications Instagram, les enregistrer dans une base de données, puis les publier automatiquement à l'heure prévue.
+async function api(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
 
-## Fonctionnalités MVP
+  if (state.token) {
+    headers.Authorization = `Bearer ${state.token}`;
+  }
 
-- création d'utilisateurs
-- connexion de comptes Instagram (mocké pour le MVP)
-- création d'une publication avec photo/vidéo, légende, date et heure
-- stockage en base SQLite
-- planificateur automatique qui vérifie les publications à publier
-- publication simulée sur Instagram
-- statut : `scheduled`, `published`, `failed`
-- historique de tentative / échec
-- retry automatique jusqu'à 3 essais
-- dashboard simple pour tester l'API
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers
+  });
 
-## Stack
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
 
-- Node.js
-- Express
-- SQLite
-- Better-SQLite3
+  if (!response.ok) {
+    throw new Error(data.message || 'Request failed');
+  }
 
-## Démarrage rapide
+  return data;
+}
 
-```bash
-npm install
-cp .env.example .env
-npm start
-```
+function renderAuth() {
+  const loggedIn = Boolean(state.token);
+  document.getElementById('authSection').classList.toggle('hidden', loggedIn);
+  document.getElementById('dashboardSection').classList.toggle('hidden', !loggedIn);
+  document.getElementById('logoutBtn').classList.toggle('hidden', !loggedIn);
 
-Puis ouvrez :
+  if (loggedIn && state.user) {
+    document.getElementById('welcomeText').textContent = `Bienvenue, ${state.user.email}`;
+  }
+}
 
-- http://localhost:3000
-- http://localhost:3000/api/health
+function renderSummary(summary) {
+  const boxes = [
+    { label: 'Total', value: summary.total || 0 },
+    { label: 'En attente', value: summary.scheduled || 0 },
+    { label: 'Publiées', value: summary.published || 0 },
+    { label: 'Échouées', value: summary.failed || 0 }
+  ];
 
-## Points d'intégration Instagram réel
+  const summaryContainer = document.getElementById('summaryBoxes');
+  summaryContainer.innerHTML = boxes.map((box) => `
+    <div class="summary-box">
+      <div class="muted">${box.label}</div>
+      <div class="value">${box.value}</div>
+    </div>
+  `).join('');
+}
 
-Le module `src/services/instagramService.js` contient un simulateur de publication pour le MVP. Pour passer en vrai intégration Instagram, il faudra remplacer ce service par un appel Facebook Graph API / Instagram Graph API avec OAuth2, access token et gestion du refresh token.
+function renderAccounts() {
+  const select = document.getElementById('postAccountSelect');
+  select.innerHTML = state.accounts.map((account) => `
+    <option value="${account.id}">${account.username}</option>
+  `).join('');
+}
 
-## Structure principale
+function renderPosts() {
+  const list = document.getElementById('postList');
 
-```text
-src/
-  app.js
-  config.js
-  db.js
-  routes/
-    accounts.js
-    publications.js
-    users.js
-  services/
-    instagramService.js
-    schedulerService.js
-public/
-  index.html
-  app.js
-server.js
-```
+  if (!state.publications.length) {
+    list.innerHTML = '<li class="post-item"><p class="muted">Aucune publication pour le moment.</p></li>';
+    return;
+  }
 
-## Exemple d'utilisation API
+  list.innerHTML = state.publications.map((post) => `
+    <li class="post-item">
+      <div class="meta">
+        <strong>${post.accountUsername || 'Compte'}</strong>
+        <span class="status-pill ${post.status}">${post.status}</span>
+      </div>
+      <p class="muted">${new Date(post.scheduledAt).toLocaleString()}</p>
+      <p>${post.caption || 'Aucune légende.'}</p>
+      <p class="muted">${post.mediaUrl || 'Aucun média'}</p>
+      ${post.lastError ? `<p class="muted">Erreur: ${post.lastError}</p>` : ''}
+    </li>
+  `).join('');
+}
 
-### Créer un utilisateur
+async function loadUser() {
+  try {
+    const user = await api('/auth/me');
+    state.user = user;
+    renderAuth();
+    await Promise.all([loadAccounts(), loadPublications(), loadSummary()]);
+  } catch (error) {
+    state.token = '';
+    localStorage.removeItem('instagramSchedulerToken');
+    state.user = null;
+    renderAuth();
+  }
+}
 
-```bash
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.com","password":"secret"}'
-```
+async function loadAccounts() {
+  try {
+    state.accounts = await api('/accounts');
+    renderAccounts();
+  } catch (error) {
+    console.error(error);
+  }
+}
 
-### Ajouter un compte Instagram
+async function loadPublications() {
+  try {
+    state.publications = await api('/publications');
+    renderPosts();
+  } catch (error) {
+    console.error(error);
+  }
+}
 
-```bash
-curl -X POST http://localhost:3000/api/accounts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId":"<user-id>",
-    "username":"alice_insta",
-    "accessToken":"fake_access_token",
-    "refreshToken":"fake_refresh_token"
-  }'
-```
+async function loadSummary() {
+  try {
+    const summary = await api('/publications/summary');
+    renderSummary(summary);
+  } catch (error) {
+    console.error(error);
+  }
+}
 
-### Créer une publication planifiée
+async function registerUser() {
+  const email = document.getElementById('registerEmail').value.trim();
+  const password = document.getElementById('registerPassword').value;
 
-```bash
-curl -X POST http://localhost:3000/api/publications \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId":"<user-id>",
-    "accountId":"<account-id>",
-    "mediaType":"image",
-    "mediaUrl":"https://example.com/image.jpg",
-    "caption":"Bonjour le monde !",
-    "scheduledAt":"2030-01-01T12:00:00.000Z"
-  }'
-```
+  try {
+    const result = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
 
-### Lister les publications
+    state.token = result.token;
+    state.user = result.user;
+    localStorage.setItem('instagramSchedulerToken', result.token);
+    renderAuth();
+    await Promise.all([loadAccounts(), loadPublications(), loadSummary()]);
+  } catch (error) {
+    alert(error.message);
+  }
+}
 
-```bash
-curl http://localhost:3000/api/publications
-```
+async function loginUser() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
 
-## Roadmap
+  try {
+    const result = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
 
-- ✅ MVP scheduler
-- ✅ historique + retry
-- ✅ dashboard local
-- ✅ statuts de publication
-- 🔄 multipliques comptes
-- �� Reels
-- 🔄 calendrier visuel
-- 🔄 analytics
-- 🔄 intégration OAuth Instagram réelle
+    state.token = result.token;
+    state.user = result.user;
+    localStorage.setItem('instagramSchedulerToken', result.token);
+    renderAuth();
+    await Promise.all([loadAccounts(), loadPublications(), loadSummary()]);
+  } catch (error) {
+    alert(error.message);
+  }
+}
 
-## Licence
+async function addAccount() {
+  const username = document.getElementById('accountUsername').value.trim();
+  const accessToken = document.getElementById('accountToken').value.trim();
 
-MIT
+  try {
+    await api('/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ username, accessToken, refreshToken: 'fake_refresh_token' })
+    });
+
+    document.getElementById('accountUsername').value = '';
+    document.getElementById('accountToken').value = '';
+    await loadAccounts();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function createPublication() {
+  const accountId = document.getElementById('postAccountSelect').value;
+  const mediaType = document.getElementById('mediaType').value;
+  const mediaUrl = document.getElementById('mediaUrl').value.trim();
+  const caption = document.getElementById('caption').value.trim();
+  const scheduledAt = document.getElementById('scheduledAt').value;
+
+  if (!accountId || !scheduledAt) {
+    alert('Le compte et la date sont requis.');
+    return;
+  }
+
+  try {
+    await api('/publications', {
+      method: 'POST',
+      body: JSON.stringify({ accountId, mediaType, mediaUrl, caption, scheduledAt })
+    });
+
+    document.getElementById('mediaUrl').value = '';
+    document.getElementById('caption').value = '';
+    document.getElementById('scheduledAt').value = '';
+
+    await Promise.all([loadPublications(), loadSummary()]);
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function logout() {
+  state.token = '';
+  state.user = null;
+  localStorage.removeItem('instagramSchedulerToken');
+  renderAuth();
+}
+
+document.getElementById('registerBtn').addEventListener('click', registerUser);
+document.getElementById('loginBtn').addEventListener('click', loginUser);
+document.getElementById('logoutBtn').addEventListener('click', logout);
+document.getElementById('addAccountBtn').addEventListener('click', addAccount);
+document.getElementById('createPostBtn').addEventListener('click', createPublication);
+document.getElementById('refreshPostsBtn').addEventListener('click', async () => {
+  await Promise.all([loadAccounts(), loadPublications(), loadSummary()]);
+});
+
+renderAuth();
+if (state.token) {
+  loadUser();
+}
